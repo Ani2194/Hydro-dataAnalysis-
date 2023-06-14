@@ -1,0 +1,112 @@
+import pandas as pd 
+import csv 
+import numpy as np 
+import matplotlib.pyplot as plt
+import math
+
+q1 = pd.read_csv(r'D:\Hydrological process\august storm.csv')
+q2 = pd.read_csv(r'D:\Hydrological process\Book1.csv', skiprows=1)
+q2.info()
+q2["Discharge (L/s)"] = q2["Discharge (L/s)"].replace(-6999, np.nan)
+q2["StreamEC-mS/cm"] = q2["StreamEC-mS/cm"].replace(-6999, np.nan)
+q1["DateTime"] = pd.to_datetime(q1["DateTime"])
+
+q1.info()
+
+
+q1["Elapsedtime"] = np.nan
+q1["Baseflow"]= np.nan
+q1["Eventflow"] = np.nan
+q1["EventflowVolume"] = np.nan
+q1["BaseflowVolume"] = np.nan
+q1["TotalflowVolume"] = np.nan
+q1["OldWater(L/s)"] = np.nan
+q1["NewWater(L/s)"] = np.nan
+q1["OldWaterVolume"] = np.nan
+q1["NewWaterVolume"] = np.nan
+l =[]
+for i in range(len(q1["Discharge"])):
+    l.append(math.log(q1["Discharge"][i]))
+for i in range(len(q1["DateTime"])): 
+    q1["Elapsedtime"][i] = i
+figure = plt.figure(1)
+plt.plot(q1["Elapsedtime"], l)
+plt.axvline(24, color = 'Black')
+plt.axvline(110, color = "Black")
+plt.ylabel("Log(Discharge)")
+plt.xlabel("Time(Hours)")
+plt.title("Log graph of discharge vs time")
+
+Q = np.interp(110, q1["Elapsedtime"], l)
+Q1 = math.exp(Q)    
+x = [24,110]
+y = [3.304, Q1]
+
+
+for i in range(len(q1["Discharge"])):
+    if np.interp(24+i,x,y) <= q1["Discharge"][i]: 
+        q1["Baseflow"][i] = np.interp(24+i, x, y )
+    if np.interp(24+i,x,y) >= q1["Discharge"][i]:
+        q1["Baseflow"][i] = q1["Discharge"][i]
+    
+
+
+
+q1["Eventflow"] = q1["Discharge"] - q1["Baseflow"]
+
+
+
+
+l =[]
+for i in range(len(q1["Discharge"])):
+    l.append(math.log(q1["Discharge"][i]))
+for i in range(len(q1["DateTime"])): 
+    q1["Elapsedtime"][i] = i
+
+
+Q = np.interp(117, q1["Elapsedtime"], l)
+Q = math.exp(Q)    
+x = [24,117]
+y = [3.304, Q]
+Cn = 0.013
+Co = 0.2
+slope , intersept = np.polyfit(x,y,1)
+
+for i in range(len(q1["Discharge"])):
+    
+    q1["EventflowVolume"][i] = q1["Eventflow"][i]*60*60
+    q1["BaseflowVolume"][i] = q1["Baseflow"][i]*60*60
+    q1["TotalflowVolume"][i] = q1["Discharge"][i]*60*60
+    q1["OldWater(L/s)"][i] = q1["Discharge"][i]*(((q1["Stream EC"][i]) - Cn)/(Co - Cn))
+    if q1["Stream EC"][i] - Co < 0:
+        q1["NewWater(L/s)"][i] = q1["Discharge"][i]*(((q1["Stream EC"][i]) - Co)/(Cn - Co))
+    else :
+        q1["NewWater(L/s)"][i] = 0
+    q1["NewWaterVolume"][i] = q1["NewWater(L/s)"][i]*60*60
+    q1["OldWaterVolume"][i] = q1["OldWater(L/s)"][i]*60*60
+    
+    
+
+Ev = (sum(q1["Eventflow"])*60*60)/(27 * (10**3))
+Bv = (sum(q1["Baseflow"]) *60*60)/(27*(10**3))
+TFv = (sum(q1["Discharge"])*60*60)/(27*(10**3))
+NWv = (sum(q1["NewWater(L/s)"])*60*60)/(27 *(10**3))
+OWv = (sum(q1["OldWater(L/s)"])*60*60)/(27*(10**3))
+
+figure , ax = plt.subplots(figsize = (12,7))
+ax.scatter(q1["Elapsedtime"], q1["Discharge"], label = "Discharge")
+ax.plot(x,y, color = 'red', label = 'Base flow')
+ax.plot(q1["Elapsedtime"], q1["Eventflow"], color= "darkblue", label = "Eventflow" )
+ax.plot(q1["Elapsedtime"], q1["NewWater(L/s)"], color = "Purple" , label = "NewWater")
+ax.plot(q1["Elapsedtime"], q1["OldWater(L/s)"], color = "Green", label = "Oldwater")
+ax.legend()
+plt.xlabel("TIME(Hours)")
+plt.ylabel("Discharge(L/s)")
+ax2 = ax.twinx()
+ax2.plot(q1["Elapsedtime"], q1["Stream EC"], color  = 'orange', label ="Electrical Conductivity" )
+ax2.set_ylabel("ELectrical Conductivity(ms/cm)")
+ax2.legend(loc ="upper left")
+plt.title("August Storm Hydrograph")
+
+
+#q1.to_excel(r'D:\Hydrological process\Hydrograph.xlsx', index= False , header = True)
